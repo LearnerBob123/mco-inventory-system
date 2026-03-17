@@ -1,18 +1,22 @@
 # inventory_routes.py
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Body
 from sqlalchemy import create_engine, text
 import os
 from dotenv import load_dotenv
 
-# Load .env file
+# Load environment variables from .env
 load_dotenv()
-DATABASE_URL = os.getenv("DATABASE_URL") or "postgresql://postgres:-bqkCbFmjBxH%2A77@db.fmdrshndlqqimwhnsira.supabase.co:5432/postgres"
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL not set in .env file")
 
 engine = create_engine(DATABASE_URL)
 
 router = APIRouter(prefix="/inventory", tags=["Inventory"])
 
-# Get current stock
+# -----------------------------
+# GET CURRENT STOCK
+# -----------------------------
 @router.get("/stock/{component_id}")
 def get_stock(component_id: int):
     with engine.connect() as conn:
@@ -24,38 +28,24 @@ def get_stock(component_id: int):
             raise HTTPException(status_code=404, detail="Component not found")
         return {"component_id": component_id, "quantity": result[0], "location": result[1]}
 
-# Process a transaction
-# inventory_routes.py
-from fastapi import APIRouter, HTTPException
-from sqlalchemy import create_engine, text
-import os
-from dotenv import load_dotenv
 
-# Load .env file
-load_dotenv()
-DATABASE_URL = os.getenv("DATABASE_URL") or "postgresql://postgres:-bqkCbFmjBxH%2A77@db.fmdrshndlqqimwhnsira.supabase.co:5432/postgres"
-
-engine = create_engine(DATABASE_URL)
-
-router = APIRouter(prefix="/inventory", tags=["Inventory"])
-
-# Get current stock
-@router.get("/stock/{component_id}")
-def get_stock(component_id: int):
-    with engine.connect() as conn:
-        result = conn.execute(
-            text("SELECT quantity, location FROM inventory WHERE component_id=:cid"),
-            {"cid": component_id}
-        ).fetchone()
-        if not result:
-            raise HTTPException(status_code=404, detail="Component not found")
-        return {"component_id": component_id, "quantity": result[0], "location": result[1]}
-
-# Process a transaction
+# -----------------------------
+# PROCESS A TRANSACTION
+# -----------------------------
 @router.post("/transaction")
-def process_transaction(component_id: int, action: str, quantity: int, user_id: int):
+def process_transaction(
+    component_id: int = Body(...),
+    action: str = Body(...),
+    quantity: int = Body(...),
+    user_id: int = Body(...)
+):
+    # Validate action
     if action not in ["store", "remove"]:
         raise HTTPException(status_code=400, detail="Invalid action")
+
+    # Validate quantity
+    if quantity <= 0:
+        raise HTTPException(status_code=400, detail="Quantity must be greater than 0")
 
     with engine.begin() as conn:  # automatic commit/rollback
         # Get current stock
@@ -63,6 +53,7 @@ def process_transaction(component_id: int, action: str, quantity: int, user_id: 
             text("SELECT quantity FROM inventory WHERE component_id=:cid"),
             {"cid": component_id}
         ).fetchone()
+
         if not result:
             raise HTTPException(status_code=404, detail="Component not found")
         current_qty = result[0]
@@ -81,7 +72,7 @@ def process_transaction(component_id: int, action: str, quantity: int, user_id: 
             {"qty": new_qty, "cid": component_id}
         )
 
-        # Insert into transaction table
+        # Insert into transactions table
         conn.execute(
             text("""
                 INSERT INTO transactions(transaction_id, component_id, action, user_id)
