@@ -1,11 +1,13 @@
 import psycopg2
+from psycopg2 import OperationalError
 
-connection = psycopg2.connect(
-    user="postgres",
-    password="Radha@108MADHAV",
-    host="db.bypisleryofkpwbneoms.supabase.co",
-    port="5432",
-    dbname="postgres"
-)
+print("Connecting to database...")
 
-print("Connected successfully")
+try:
+    connection = psycopg2.connect(
+        "postgresql://postgres:-bqkCbFmjBxH%2A77@db.fmdrshndlqqimwhnsira.supabase.co:5432/postgres",
+        connect_timeout=5
+    )
+    print("Connected successfully")
+except OperationalError as e:
+    print(f"Error: {e}")
