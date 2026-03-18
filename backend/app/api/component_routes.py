@@ -21,6 +21,9 @@ def add_component(component: ComponentCreate, db: Session = Depends(get_db)):
     if existing:
         return {"error": "Component already exists"}
 
+    if component.state is None or component.state == "":
+        return {"error": "State cannot be empty"}
+
     new_component = Component(
         component_id=component.component_id,
         name=component.name,
@@ -29,9 +32,16 @@ def add_component(component: ComponentCreate, db: Session = Depends(get_db)):
 
     db.add(new_component)
     db.commit()
+    db.refresh(new_component)
 
-    return {"message": "Component Added"}
-
+    return {
+        "message": "Component Added Successfully",
+        "component": {
+            "component_id": new_component.component_id,
+            "name": new_component.name,
+            "state": new_component.state
+        }
+    }
 
 # LIST COMPONENTS
 @router.get("/component/list")
