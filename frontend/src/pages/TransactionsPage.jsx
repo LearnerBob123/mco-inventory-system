@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import FormInput from "../components/FormInput";
 import TableView from "../components/TableView";
 import { createTransaction, getComponents, getTransactions } from "../services/api";
+import GeneratePDF from "../components/GeneratePDF";
 
 const initialForm = {
   part_number: "",
@@ -106,6 +107,7 @@ export default function TransactionsPage() {
 
       <div className="card">
         <h2>Transaction Log</h2>
+        <GeneratePDF data={transactions} />
         <TableView columns={columns} rows={transactions} emptyText="No transactions found." />
       </div>
     </section>
