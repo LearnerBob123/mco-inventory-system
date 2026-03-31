@@ -1,5 +1,42 @@
+# Environment files
 .env
+.env.*
+!.env.example
+backend/.env
+backend/.env.*
+!backend/.env.example
+frontend/.env
+frontend/.env.*
+
+# Python virtual environments
 venv/
+.venv/
 backend/venv/
+venv_tushar/
+
+# Python cache/build artifacts
 __pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Logs
 logs/
+backend/logs/
+*.log
+
+# Frontend / Node / Vite
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# OS / editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

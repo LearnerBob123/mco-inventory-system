@@ -31,6 +31,10 @@ if config.config_file_name is not None:
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
 from app.database.base import Base
+from app.models import models as legacy_models  # noqa: F401
+from app.models import hierarchy as hierarchy_models  # noqa: F401
+from app.models import component_v2 as component_models_v2  # noqa: F401
+from app.models import inventory_v2 as inventory_models_v2  # noqa: F401
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,

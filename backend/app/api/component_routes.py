@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Depends, Body
+from fastapi import APIRouter, Body, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database.session import get_db
-from app.models.models import Component, ComponentCreate, LifecycleLog
-from app.services.module_d.lifecycle import transition
-from app.services.module_e.rbac import require_role
-from app.utils.audit import log_transition
+from app.api.component_v2_routes import validate_component_hierarchy
+from app.models.component_v2 import ComponentDefinition
+from app.schemas.component_schema import ComponentCreate
 
 router = APIRouter()
 
@@ -14,38 +14,72 @@ router = APIRouter()
 @router.post("/component/add")
 def add_component(component: ComponentCreate, db: Session = Depends(get_db)):
 
-    existing = db.query(Component).filter(
-        Component.component_id == component.component_id
+    existing = db.query(ComponentDefinition).filter(
+        ComponentDefinition.part_number == component.part_number
     ).first()
 
     if existing:
-        return {"error": "Component already exists"}
+        raise HTTPException(status_code=409, detail="Component already exists")
 
-    new_component = Component(
-        component_id=component.component_id,
-        name=component.name,
-        state=component.state
+    validate_component_hierarchy(component, db)
+
+    new_component = ComponentDefinition(
+        part_number=component.part_number,
+        gun_id=component.gun_id,
+        major_assembly_id=component.major_assembly_id,
+        sub_assembly_id=component.sub_assembly_id,
+        nomenclature=component.nomenclature,
+        ved_status=component.ved_status,
+        change_category=component.change_category,
+        item_type=component.item_type,
+        source_type=component.source_type,
     )
 
-    db.add(new_component)
-    db.commit()
+    try:
+        db.add(new_component)
+        db.commit()
+        db.refresh(new_component)
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=422,
+            detail="Invalid domain value for component fields. Allowed values: ved_status[V,E,D], change_category[MC,CC], item_type[Expendable,Non-Expendable], source_type[OSS,LP,IR&D,LRC,LM,Cannibalization,Reclamation,ERC].",
+        ) from exc
 
-    return {"message": "Component Added"}
-
+    return {
+        "message": "Component Added Successfully",
+        "component": {
+            "part_number": new_component.part_number,
+            "gun_id": new_component.gun_id,
+            "major_assembly_id": new_component.major_assembly_id,
+            "sub_assembly_id": new_component.sub_assembly_id,
+            "nomenclature": new_component.nomenclature,
+            "ved_status": new_component.ved_status,
+            "change_category": new_component.change_category,
+            "item_type": new_component.item_type,
+            "source_type": new_component.source_type,
+        },
+    }
 
 # LIST COMPONENTS
 @router.get("/component/list")
 def list_components(db: Session = Depends(get_db)):
 
-    components = db.query(Component).all()
+    components = db.query(ComponentDefinition).all()
 
     result = []
 
     for c in components:
         result.append({
-            "component_id": c.component_id,
-            "name": c.name,
-            "state": c.state
+            "part_number": c.part_number,
+            "gun_id": c.gun_id,
+            "major_assembly_id": c.major_assembly_id,
+            "sub_assembly_id": c.sub_assembly_id,
+            "nomenclature": c.nomenclature,
+            "ved_status": c.ved_status,
+            "change_category": c.change_category,
+            "item_type": c.item_type,
+            "source_type": c.source_type,
         })
 
     return result
@@ -54,42 +88,11 @@ def list_components(db: Session = Depends(get_db)):
 # TRANSITION STATE
 @router.post("/component/transition")
 def change_state(
-    component_id: int = Body(...),
+    component_id: str = Body(...),
     new_state: str = Body(...),
     db: Session = Depends(get_db)
 ):
-
-    component = db.query(Component).filter(
-        Component.component_id == component_id
-    ).first()
-
-    if not component:
-        return {"error": "Component not found"}
-
-    current_state = component.state
-
-    if transition(current_state, new_state):
-
-        component.state = new_state
-
-        log_entry = LifecycleLog(
-            component_id=component_id,
-            old_state=current_state,
-            new_state=new_state
-        )
-
-        db.add(log_entry)
-        db.commit()
-
-        log_transition(component_id, current_state, new_state)
-
-        return {
-            "message": "Transition Successful",
-            "component": component_id,
-            "new_state": new_state
-        }
-
-    return {
-        "error": "Invalid State Transition",
-        "current_state": current_state
-    }
+    raise HTTPException(
+        status_code=410,
+        detail="Transition API is unavailable for v2 component model because state lifecycle is not part of the new component schema.",
+    )

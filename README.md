@@ -138,6 +138,13 @@ backend
 * All database schema changes must be done through **Alembic migrations**.
 * Always run migrations before starting the server.
 
+### Schema Compatibility
+
+* The legacy `component` table is preserved and is **not** modified by the new BOM and inventory migration flow.
+* All new schema work writes to `component_v2` and related tables: `hierarchy_node`, `component_usage`, `inventory_stock`, and `stock_transaction`.
+* New API routes for the redesigned schema are exposed under `/v2/...`.
+* No automatic data migration from `component` to `component_v2` is performed at this stage.
+
 ---
 
 ## Development Workflow

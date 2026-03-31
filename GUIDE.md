@@ -175,6 +175,19 @@ Database schema changes are handled using **Alembic**.
 
 Alembic tracks schema versions and allows safe upgrades.
 
+## Current Compatibility Mode
+
+The backend currently runs in a compatibility mode for component redesign:
+
+* Existing legacy table `component` remains untouched for backward safety.
+* New redesign tables are additive and use `component_v2` as the global component definition table.
+* New foreign key relationships for the redesign point to `component_v2.part_number`.
+* Current v2 API surface includes:
+       * `/v2/component/*`
+       * `/v2/inventory/*`
+       * `/v2/hierarchy/*`
+* No legacy data is copied into `component_v2` during migration.
+
 ### Generate Migration
 
 ```
