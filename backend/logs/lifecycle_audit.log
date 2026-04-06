@@ -1,6 +1,0 @@
-10 | Receipt -> Awaiting FFFT | 2026-03-10 17:23:39.451228
-5 | Awaiting FFFT -> Under FFFT | 2026-03-12 16:33:27.648539
-5 | Under FFFT -> Serviceable | 2026-03-12 16:45:23.925074
-10 | Awaiting FFFT -> Under FFFT | 2026-03-12 16:45:30.254302
-10 | Under FFFT -> Unserviceable | 2026-03-12 16:51:33.936007
-10 | Unserviceable -> Disposal | 2026-03-12 16:51:48.849603

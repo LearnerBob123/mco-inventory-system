@@ -1,0 +1,216 @@
+:root {
+  font-family: Arial, sans-serif;
+  color: #111827;
+  background: #f3f4f6;
+  line-height: 1.4;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: #f3f4f6;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  border: 1px solid #1f2937;
+  background: #1f2937;
+  color: #ffffff;
+  cursor: pointer;
+  padding: 0.7rem 1rem;
+  border-radius: 4px;
+}
+
+button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.button-secondary {
+  background: #ffffff;
+  color: #111827;
+}
+
+input,
+select {
+  width: 100%;
+  border: 1px solid #9ca3af;
+  border-radius: 4px;
+  background: #ffffff;
+  padding: 0.7rem 0.8rem;
+  color: #111827;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.app-shell {
+  width: min(960px, calc(100% - 2rem));
+  margin: 0 auto;
+  padding: 1rem 0 2rem;
+}
+
+.page-header {
+  margin-bottom: 1rem;
+}
+
+.page-header h1 {
+  margin: 0 0 0.5rem;
+  font-size: 1.8rem;
+}
+
+.page-header p {
+  margin: 0.25rem 0;
+}
+
+.api-line {
+  color: #4b5563;
+}
+
+.simple-layout {
+  display: grid;
+  gap: 1rem;
+}
+
+.tab-bar {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.tab-button {
+  border: 1px solid #9ca3af;
+  background: #ffffff;
+  color: #111827;
+}
+
+.tab-button--active {
+  border-color: #1f2937;
+  background: #1f2937;
+  color: #ffffff;
+}
+
+.section-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.section-card {
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 1rem;
+}
+
+.section-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.section-card__eyebrow {
+  display: none;
+}
+
+.section-card h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.subheading {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+}
+
+.stack-form,
+.detail-stack {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.stack-form label {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.stack-form span {
+  font-weight: 600;
+}
+
+.button-row {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.message-banner {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+}
+
+.status-pill {
+  display: inline-block;
+  border: 1px solid #9ca3af;
+  border-radius: 4px;
+  padding: 0.35rem 0.6rem;
+  background: #f9fafb;
+  font-size: 0.9rem;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  border: 1px solid #d1d5db;
+  padding: 0.65rem 0.75rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  background: #f9fafb;
+  font-weight: 600;
+}
+
+.empty-row,
+.empty-text {
+  color: #4b5563;
+}
+
+@media (max-width: 640px) {
+  .app-shell {
+    width: calc(100% - 1rem);
+    padding-top: 0.5rem;
+  }
+
+  .button-row {
+    flex-direction: column;
+  }
+
+  .section-grid {
+    grid-template-columns: 1fr;
+  }
+}
