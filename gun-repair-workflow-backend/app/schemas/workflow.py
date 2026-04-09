@@ -9,40 +9,34 @@ from app.schemas.user import UserRead
 class WorkflowCreate(BaseModel):
     title: str = Field(min_length=1, max_length=150)
     work_order_id: int
-    admin_user_id: int
 
 
 class WorkflowAssignWorkers(BaseModel):
     worker_ids: list[int] = Field(min_length=1)
-    admin_user_id: int
 
 
 class WorkflowResourceRequestCreate(BaseModel):
     part_number: str = Field(min_length=1, max_length=50)
     requested_qty: int = Field(gt=0)
-    requested_by: int
 
 
 class WorkflowRequestDecision(BaseModel):
-    admin_user_id: int
     feedback_message: str | None = Field(default=None, max_length=500)
 
 
 class WorkflowCompleteTask(BaseModel):
-    worker_id: int
+    pass
 
 
 class WorkflowFinalize(BaseModel):
-    admin_user_id: int
+    pass
 
 
 class WorkflowRework(BaseModel):
-    admin_user_id: int
     feedback_message: str = Field(min_length=1, max_length=1000)
 
 
 class WorkflowFeedbackCreate(BaseModel):
-    admin_user_id: int
     to_user_id: int | None = None
     message: str = Field(min_length=1, max_length=1000)
 
@@ -69,6 +63,8 @@ class WorkflowResourceRequestRead(BaseModel):
     reviewed_by: int | None
     feedback_message: str | None
     created_at: datetime
+    requested_by_user: UserRead
+    reviewed_by_user: UserRead | None
 
 
 class WorkflowFeedbackRead(BaseModel):
@@ -80,6 +76,8 @@ class WorkflowFeedbackRead(BaseModel):
     to_user_id: int | None
     message: str
     created_at: datetime
+    from_user: UserRead
+    to_user: UserRead | None
 
 
 class WorkflowRead(BaseModel):
@@ -93,6 +91,8 @@ class WorkflowRead(BaseModel):
     finalized_by: int | None
     final_feedback: str | None
     created_at: datetime
+    created_by_user: UserRead
+    finalized_by_user: UserRead | None
     assignments: list[WorkflowAssignmentRead]
     resource_requests: list[WorkflowResourceRequestRead]
     feedback_entries: list[WorkflowFeedbackRead]

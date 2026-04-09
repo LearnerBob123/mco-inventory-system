@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import RoleContext
+from app.models.user import User
 from app.repositories.inventory_repository import InventoryRepository
 from app.repositories.user_repository import UserRepository
 from app.repositories.work_order_repository import WorkOrderRepository
@@ -27,32 +27,30 @@ class WorkflowService:
         self.workflow_repository = WorkflowRepository(db)
         self.workflow_resource_request_repository = WorkflowResourceRequestRepository(db)
 
-    def list_workflows(self, *, role_context: RoleContext, user_id: int | None = None):
-        if role_context.role == "admin":
+    def list_workflows(self, *, current_user: User):
+        if current_user.role == "admin":
             return self.workflow_repository.list_all()
 
-        worker = self._require_user_with_role(user_id, expected_role="worker")
-        return self.workflow_repository.list_by_worker(worker.id)
+        self._require_user_role(current_user, expected_role="worker")
+        return self.workflow_repository.list_by_worker(current_user.id)
 
-    def list_pending_requests(self, *, role_context: RoleContext):
-        self._require_role_context(role_context, required_role="admin")
+    def list_pending_requests(self, *, current_user: User):
+        self._require_user_role(current_user, expected_role="admin")
         return self.workflow_resource_request_repository.list_pending()
 
-    def get_workflow(self, *, workflow_id: int, role_context: RoleContext, user_id: int | None = None):
+    def get_workflow(self, *, workflow_id: int, current_user: User):
         workflow = self._require_workflow(workflow_id)
-        if role_context.role == "worker":
-            worker = self._require_user_with_role(user_id, expected_role="worker")
+        if current_user.role == "worker":
             assignment = self.workflow_assignment_repository.get_by_workflow_and_user(
                 workflow_id=workflow.id,
-                user_id=worker.id,
+                user_id=current_user.id,
             )
             if assignment is None:
                 raise AuthorizationError("Workers can only view workflows assigned to them.")
         return workflow
 
-    def create_workflow(self, *, title: str, work_order_id: int, admin_user_id: int, role_context: RoleContext):
-        self._require_role_context(role_context, required_role="admin")
-        admin = self._require_user_with_role(admin_user_id, expected_role="admin")
+    def create_workflow(self, *, title: str, work_order_id: int, current_user: User):
+        admin = self._require_user_role(current_user, expected_role="admin")
         work_order = self.work_order_repository.get_by_id(work_order_id)
         if work_order is None:
             raise EntityNotFoundError(f"Work order with id {work_order_id} was not found.")
@@ -61,9 +59,8 @@ class WorkflowService:
         log_workflow_event("workflow_created", f"workflow={workflow.id} work_order={work_order_id} admin={admin.id}")
         return workflow
 
-    def assign_workers(self, *, workflow_id: int, worker_ids: list[int], admin_user_id: int, role_context: RoleContext):
-        self._require_role_context(role_context, required_role="admin")
-        admin = self._require_user_with_role(admin_user_id, expected_role="admin")
+    def assign_workers(self, *, workflow_id: int, worker_ids: list[int], current_user: User):
+        admin = self._require_user_role(current_user, expected_role="admin")
         workflow = self._require_workflow(workflow_id)
 
         for worker_id in worker_ids:
@@ -84,12 +81,10 @@ class WorkflowService:
         workflow_id: int,
         part_number: str,
         requested_qty: int,
-        requested_by: int,
-        role_context: RoleContext,
+        current_user: User,
     ):
-        self._require_role_context(role_context, required_role="worker")
+        worker = self._require_user_role(current_user, expected_role="worker")
         workflow = self._require_workflow(workflow_id)
-        worker = self._require_user_with_role(requested_by, expected_role="worker")
         self._require_assignment(workflow_id=workflow.id, worker_id=worker.id)
 
         inventory_item = self.inventory_repository.get_by_part_number(part_number)
@@ -109,13 +104,11 @@ class WorkflowService:
         self,
         *,
         request_id: int,
-        admin_user_id: int,
-        role_context: RoleContext,
+        current_user: User,
         status: str,
         feedback_message: str | None,
     ):
-        self._require_role_context(role_context, required_role="admin")
-        admin = self._require_user_with_role(admin_user_id, expected_role="admin")
+        admin = self._require_user_role(current_user, expected_role="admin")
         request = self.workflow_resource_request_repository.get_by_id(request_id)
         if request is None:
             raise EntityNotFoundError(f"Workflow resource request with id {request_id} was not found.")
@@ -129,11 +122,10 @@ class WorkflowService:
         log_workflow_event("resource_reviewed", f"request={request.id} status={status} admin={admin.id}")
         return self._require_workflow(request.workflow_id)
 
-    def mark_worker_completed(self, *, workflow_id: int, worker_id: int, role_context: RoleContext):
-        self._require_role_context(role_context, required_role="worker")
+    def mark_worker_completed(self, *, workflow_id: int, current_user: User):
+        worker = self._require_user_role(current_user, expected_role="worker")
         workflow = self._require_workflow(workflow_id)
-        self._require_user_with_role(worker_id, expected_role="worker")
-        assignment = self._require_assignment(workflow_id=workflow.id, worker_id=worker_id)
+        assignment = self._require_assignment(workflow_id=workflow.id, worker_id=worker.id)
 
         assignment.completion_state = "completed"
         assignment.completed_at = datetime.now(timezone.utc)
@@ -145,12 +137,11 @@ class WorkflowService:
             refreshed_workflow = self.workflow_repository.save(refreshed_workflow)
             log_workflow_event("workflow_pending_approval", f"workflow={refreshed_workflow.id}")
 
-        log_workflow_event("worker_completed", f"workflow={workflow.id} worker={worker_id}")
+        log_workflow_event("worker_completed", f"workflow={workflow.id} worker={worker.id}")
         return self._require_workflow(workflow_id)
 
-    def finalize_workflow(self, *, workflow_id: int, admin_user_id: int, role_context: RoleContext):
-        self._require_role_context(role_context, required_role="admin")
-        admin = self._require_user_with_role(admin_user_id, expected_role="admin")
+    def finalize_workflow(self, *, workflow_id: int, current_user: User):
+        admin = self._require_user_role(current_user, expected_role="admin")
         workflow = self._require_workflow(workflow_id)
         if workflow.state != "pending_approval":
             raise ConflictError("Workflow can only be finalized from pending_approval state.")
@@ -161,9 +152,8 @@ class WorkflowService:
         log_workflow_event("workflow_completed", f"workflow={workflow.id} admin={admin.id}")
         return workflow
 
-    def send_rework(self, *, workflow_id: int, admin_user_id: int, feedback_message: str, role_context: RoleContext):
-        self._require_role_context(role_context, required_role="admin")
-        admin = self._require_user_with_role(admin_user_id, expected_role="admin")
+    def send_rework(self, *, workflow_id: int, feedback_message: str, current_user: User):
+        admin = self._require_user_role(current_user, expected_role="admin")
         workflow = self._require_workflow(workflow_id)
         if workflow.state != "pending_approval":
             raise ConflictError("Workflow can only be sent for rework from pending_approval state.")
@@ -190,13 +180,11 @@ class WorkflowService:
         self,
         *,
         workflow_id: int,
-        admin_user_id: int,
         to_user_id: int | None,
         message: str,
-        role_context: RoleContext,
+        current_user: User,
     ):
-        self._require_role_context(role_context, required_role="admin")
-        admin = self._require_user_with_role(admin_user_id, expected_role="admin")
+        admin = self._require_user_role(current_user, expected_role="admin")
         workflow = self._require_workflow(workflow_id)
         if to_user_id is not None:
             self._require_user_with_role(to_user_id, expected_role="worker")
@@ -226,6 +214,13 @@ class WorkflowService:
             raise AuthorizationError("Worker is not assigned to this workflow.")
         return assignment
 
+    def _require_user_role(self, user: User | None, *, expected_role: str):
+        if user is None:
+            raise ValidationError("An authenticated user is required for this action.")
+        if user.role != expected_role:
+            raise AuthorizationError(f"Expected user role '{expected_role}'.")
+        return user
+
     def _require_user_with_role(self, user_id: int | None, *, expected_role: str):
         if user_id is None:
             raise ValidationError("A user id is required for this action.")
@@ -235,7 +230,3 @@ class WorkflowService:
         if user.role != expected_role:
             raise AuthorizationError(f"Expected user role '{expected_role}'.")
         return user
-
-    def _require_role_context(self, role_context: RoleContext, *, required_role: str) -> None:
-        if role_context.role != required_role:
-            raise AuthorizationError(f"This action requires role context '{required_role}'.")

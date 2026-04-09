@@ -64,6 +64,13 @@ select {
   margin-bottom: 1rem;
 }
 
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
 .page-header h1 {
   margin: 0 0 0.5rem;
   font-size: 1.8rem;
@@ -204,6 +211,10 @@ th {
   .app-shell {
     width: calc(100% - 1rem);
     padding-top: 0.5rem;
+  }
+
+  .header-row {
+    flex-direction: column;
   }
 
   .button-row {

@@ -3,7 +3,8 @@ from typing import Annotated, NoReturn
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_db_session
+from app.api.dependencies import CurrentUser, get_current_admin_user, get_db_session
+from app.models.user import User
 from app.schemas.user import UserCreate, UserRead
 from app.services.exceptions import ConflictError
 from app.services.user_service import UserService
@@ -20,17 +21,19 @@ def _raise_http_error(exc: Exception) -> NoReturn:
 
 
 @router.get("", response_model=list[UserRead])
-def list_users(db: DbSession) -> list[UserRead]:
+def list_users(db: DbSession, current_user: CurrentUser) -> list[UserRead]:
+    del current_user
     service = UserService(db)
     users = service.list_users()
     return [UserRead.model_validate(user) for user in users]
 
 
 @router.post("", response_model=UserRead, status_code=status.HTTP_201_CREATED)
-def create_user(payload: UserCreate, db: DbSession) -> UserRead:
+def create_user(payload: UserCreate, db: DbSession, current_user: User = Depends(get_current_admin_user)) -> UserRead:
+    del current_user
     service = UserService(db)
     try:
-        user = service.create_user(name=payload.name, role=payload.role)
+        user = service.create_user(name=payload.name, role=payload.role, password=payload.password)
         return UserRead.model_validate(user)
     except ConflictError as exc:
         _raise_http_error(exc)

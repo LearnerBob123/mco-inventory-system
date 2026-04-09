@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     app_name: str = "Gun Repair Workflow Prototype"
     database_url: str = "mysql+pymysql://root:password@localhost:3306/gun_repair_workflow"
     cors_origins: str = "http://localhost:5173"
+    auth_session_ttl_hours: int = 12
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

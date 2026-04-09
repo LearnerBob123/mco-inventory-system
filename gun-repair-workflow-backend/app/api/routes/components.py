@@ -3,7 +3,7 @@ from typing import Annotated, NoReturn
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_db_session
+from app.api.dependencies import CurrentUser, get_current_user, get_db_session
 from app.schemas.component import ComponentDecisionRequest, WorkOrderComponentRead
 from app.services.component_service import ComponentService
 from app.services.exceptions import AuthorizationError, ConflictError, EntityNotFoundError
@@ -28,10 +28,12 @@ def approve_component(
     component_request_id: int,
     payload: ComponentDecisionRequest,
     db: DbSession,
+    current_user: CurrentUser,
 ) -> WorkOrderComponentRead:
+    del payload
     service = ComponentService(db)
     try:
-        component = service.approve_component(component_request_id=component_request_id, approved_by=payload.approved_by)
+        component = service.approve_component(component_request_id=component_request_id, current_user=current_user)
         return WorkOrderComponentRead.model_validate(component)
     except (EntityNotFoundError, AuthorizationError, ConflictError) as exc:
         _raise_http_error(exc)
@@ -42,10 +44,12 @@ def reject_component(
     component_request_id: int,
     payload: ComponentDecisionRequest,
     db: DbSession,
+    current_user: CurrentUser,
 ) -> WorkOrderComponentRead:
+    del payload
     service = ComponentService(db)
     try:
-        component = service.reject_component(component_request_id=component_request_id, approved_by=payload.approved_by)
+        component = service.reject_component(component_request_id=component_request_id, current_user=current_user)
         return WorkOrderComponentRead.model_validate(component)
     except (EntityNotFoundError, AuthorizationError, ConflictError) as exc:
         _raise_http_error(exc)

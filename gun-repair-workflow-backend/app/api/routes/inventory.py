@@ -3,7 +3,8 @@ from typing import Annotated, NoReturn
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_db_session
+from app.api.dependencies import CurrentUser, get_current_admin_user, get_db_session
+from app.models.user import User
 from app.schemas.inventory import InventoryCreate, InventoryRead
 from app.services.exceptions import ConflictError
 from app.services.inventory_service import InventoryService
@@ -20,14 +21,20 @@ def _raise_http_error(exc: Exception) -> NoReturn:
 
 
 @router.get("", response_model=list[InventoryRead])
-def list_inventory(db: DbSession) -> list[InventoryRead]:
+def list_inventory(db: DbSession, current_user: CurrentUser) -> list[InventoryRead]:
+    del current_user
     service = InventoryService(db)
     items = service.list_inventory()
     return [InventoryRead.model_validate(item) for item in items]
 
 
 @router.post("", response_model=InventoryRead, status_code=status.HTTP_201_CREATED)
-def create_inventory_item(payload: InventoryCreate, db: DbSession) -> InventoryRead:
+def create_inventory_item(
+    payload: InventoryCreate,
+    db: DbSession,
+    current_user: User = Depends(get_current_admin_user),
+) -> InventoryRead:
+    del current_user
     service = InventoryService(db)
     try:
         item = service.create_inventory_item(

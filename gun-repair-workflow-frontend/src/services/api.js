@@ -1,4 +1,5 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
+const TOKEN_STORAGE_KEY = "gun-repair-auth-token";
 
 function buildUrl(path, query = {}) {
   const url = new URL(`${API_BASE_URL}${path}`);
@@ -10,292 +11,277 @@ function buildUrl(path, query = {}) {
   return url.toString();
 }
 
-async function handleResponse(response) {
+export function getStoredAuthToken() {
+  return window.localStorage.getItem(TOKEN_STORAGE_KEY);
+}
+
+function setStoredAuthToken(token) {
+  window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
+}
+
+export function clearStoredAuthToken() {
+  window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+}
+
+function formatDetail(detail) {
+  if (Array.isArray(detail)) {
+    return detail
+      .map((item) => {
+        if (typeof item === "string") {
+          return item;
+        }
+        if (item && typeof item === "object") {
+          const location = Array.isArray(item.loc) ? item.loc.slice(1).join(".") : "field";
+          const message = item.msg || "Invalid value.";
+          return `${location}: ${message}`;
+        }
+        return String(item);
+      })
+      .join("; ");
+  }
+
+  if (detail && typeof detail === "object") {
+    return JSON.stringify(detail);
+  }
+
+  return String(detail);
+}
+
+async function handleResponse(response, { clearTokenOnUnauthorized = true } = {}) {
   const contentType = response.headers.get("content-type") || "";
   const payload = contentType.includes("application/json") ? await response.json() : await response.text();
 
   if (!response.ok) {
-    const message = typeof payload === "object" && payload !== null && "detail" in payload ? payload.detail : "Request failed.";
-    throw new Error(String(message));
+    if (response.status === 401 && clearTokenOnUnauthorized) {
+      clearStoredAuthToken();
+    }
+    const message = typeof payload === "object" && payload !== null && "detail" in payload ? formatDetail(payload.detail) : "Request failed.";
+    throw new Error(message);
   }
 
   return payload;
 }
 
-export async function createWorkOrder(gunId) {
-  const response = await fetch(buildUrl("/work-orders"), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ gun_id: Number(gunId) }),
+async function apiFetch(path, { method = "GET", query, body, auth = true } = {}) {
+  const headers = {};
+  if (body !== undefined) {
+    headers["Content-Type"] = "application/json";
+  }
+  if (auth) {
+    const token = getStoredAuthToken();
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+  }
+
+  const response = await fetch(buildUrl(path, query), {
+    method,
+    headers,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 
-  return handleResponse(response);
+  return handleResponse(response, { clearTokenOnUnauthorized: auth });
+}
+
+export async function loginUser(payload) {
+  const response = await apiFetch("/auth/login", {
+    method: "POST",
+    auth: false,
+    body: {
+      name: payload.name,
+      role: payload.role,
+      password: payload.password,
+    },
+  });
+  setStoredAuthToken(response.access_token);
+  return response;
+}
+
+export async function fetchCurrentSession() {
+  return apiFetch("/auth/me");
+}
+
+export async function logoutUser() {
+  try {
+    await apiFetch("/auth/logout", { method: "POST", body: {} });
+  } finally {
+    clearStoredAuthToken();
+  }
+}
+
+export async function createWorkOrder(gunId) {
+  return apiFetch("/work-orders", {
+    method: "POST",
+    body: { gun_id: Number(gunId) },
+  });
 }
 
 export async function listWorkOrders() {
-  const response = await fetch(buildUrl("/work-orders"));
-  return handleResponse(response);
+  return apiFetch("/work-orders");
 }
 
 export async function getWorkOrderById(workOrderId) {
-  const response = await fetch(buildUrl(`/work-orders/${workOrderId}`));
-  return handleResponse(response);
+  return apiFetch(`/work-orders/${workOrderId}`);
 }
 
 export async function assignWorker(workOrderId, userId) {
-  const response = await fetch(buildUrl(`/work-orders/${workOrderId}/assign-worker`), {
+  return apiFetch(`/work-orders/${workOrderId}/assign-worker`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ user_id: Number(userId) }),
+    body: { user_id: Number(userId) },
   });
-
-  return handleResponse(response);
 }
 
 export async function requestComponent(workOrderId, payload) {
-  const response = await fetch(buildUrl(`/work-orders/${workOrderId}/components/request`), {
+  return apiFetch(`/work-orders/${workOrderId}/components/request`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
+    body: {
       part_number: payload.partNumber,
       requested_qty: Number(payload.requestedQty),
-      requested_by: Number(payload.requestedBy),
-    }),
+    },
   });
-
-  return handleResponse(response);
 }
 
-export async function approveComponent(componentRequestId, approvedBy) {
-  const response = await fetch(buildUrl(`/components/${componentRequestId}/approve`), {
+export async function approveComponent(componentRequestId) {
+  return apiFetch(`/components/${componentRequestId}/approve`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ approved_by: Number(approvedBy) }),
+    body: {},
   });
-
-  return handleResponse(response);
 }
 
-export async function rejectComponent(componentRequestId, approvedBy) {
-  const response = await fetch(buildUrl(`/components/${componentRequestId}/reject`), {
+export async function rejectComponent(componentRequestId) {
+  return apiFetch(`/components/${componentRequestId}/reject`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ approved_by: Number(approvedBy) }),
+    body: {},
   });
-
-  return handleResponse(response);
 }
 
 export async function listGuns() {
-  const response = await fetch(buildUrl("/guns"));
-  return handleResponse(response);
+  return apiFetch("/guns");
 }
 
 export async function createGun(name) {
-  const response = await fetch(buildUrl("/guns"), {
+  return apiFetch("/guns", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ name }),
+    body: { name },
   });
-
-  return handleResponse(response);
 }
 
 export async function listUsers() {
-  const response = await fetch(buildUrl("/users"));
-  return handleResponse(response);
+  return apiFetch("/users");
 }
 
-export async function createUser(name, role) {
-  const response = await fetch(buildUrl("/users"), {
+export async function createUser(name, role, password) {
+  return apiFetch("/users", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ name, role }),
+    body: { name, role, password },
   });
-
-  return handleResponse(response);
 }
 
 export async function listInventory() {
-  const response = await fetch(buildUrl("/inventory"));
-  return handleResponse(response);
+  return apiFetch("/inventory");
 }
 
 export async function createInventoryItem(payload) {
-  const response = await fetch(buildUrl("/inventory"), {
+  return apiFetch("/inventory", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
+    body: {
       part_number: payload.partNumber,
       name: payload.name,
       stock: Number(payload.stock),
-    }),
-  });
-
-  return handleResponse(response);
-}
-
-export async function listWorkflows(role, userId) {
-  const response = await fetch(buildUrl("/workflows", { role, user_id: userId }));
-  return handleResponse(response);
-}
-
-export async function getWorkflowById(workflowId, role, userId) {
-  const response = await fetch(buildUrl(`/workflows/${workflowId}`, { role, user_id: userId }));
-  return handleResponse(response);
-}
-
-export async function createWorkflow(payload, role) {
-  const response = await fetch(buildUrl("/workflows", { role }), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
     },
-    body: JSON.stringify({
+  });
+}
+
+export async function listWorkflows() {
+  return apiFetch("/workflows");
+}
+
+export async function getWorkflowById(workflowId) {
+  return apiFetch(`/workflows/${workflowId}`);
+}
+
+export async function createWorkflow(payload) {
+  return apiFetch("/workflows", {
+    method: "POST",
+    body: {
       title: payload.title,
       work_order_id: Number(payload.workOrderId),
-      admin_user_id: Number(payload.adminUserId),
-    }),
+    },
   });
-
-  return handleResponse(response);
 }
 
-export async function assignWorkflowWorkers(workflowId, payload, role) {
-  const response = await fetch(buildUrl(`/workflows/${workflowId}/assign-workers`, { role }), {
+export async function assignWorkflowWorkers(workflowId, payload) {
+  return apiFetch(`/workflows/${workflowId}/assign-workers`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
+    body: {
       worker_ids: payload.workerIds.map((item) => Number(item)),
-      admin_user_id: Number(payload.adminUserId),
-    }),
-  });
-
-  return handleResponse(response);
-}
-
-export async function listPendingWorkflowRequests(role) {
-  const response = await fetch(buildUrl("/workflows/pending-requests", { role }));
-  return handleResponse(response);
-}
-
-export async function submitWorkflowResourceRequest(workflowId, payload, role) {
-  const response = await fetch(buildUrl(`/workflows/${workflowId}/resource-requests`, { role }), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
     },
-    body: JSON.stringify({
+  });
+}
+
+export async function listPendingWorkflowRequests() {
+  return apiFetch("/workflows/pending-requests");
+}
+
+export async function submitWorkflowResourceRequest(workflowId, payload) {
+  return apiFetch(`/workflows/${workflowId}/resource-requests`, {
+    method: "POST",
+    body: {
       part_number: payload.partNumber,
       requested_qty: Number(payload.requestedQty),
-      requested_by: Number(payload.requestedBy),
-    }),
+    },
   });
-
-  return handleResponse(response);
 }
 
-export async function approveWorkflowRequest(requestId, payload, role) {
-  const response = await fetch(buildUrl(`/workflows/resource-requests/${requestId}/approve`, { role }), {
+export async function approveWorkflowRequest(requestId, payload) {
+  return apiFetch(`/workflows/resource-requests/${requestId}/approve`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      admin_user_id: Number(payload.adminUserId),
+    body: {
       feedback_message: payload.feedbackMessage || null,
-    }),
+    },
   });
-
-  return handleResponse(response);
 }
 
-export async function rejectWorkflowRequest(requestId, payload, role) {
-  const response = await fetch(buildUrl(`/workflows/resource-requests/${requestId}/reject`, { role }), {
+export async function rejectWorkflowRequest(requestId, payload) {
+  return apiFetch(`/workflows/resource-requests/${requestId}/reject`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      admin_user_id: Number(payload.adminUserId),
+    body: {
       feedback_message: payload.feedbackMessage || null,
-    }),
+    },
   });
-
-  return handleResponse(response);
 }
 
-export async function completeWorkflowTask(workflowId, workerId, role) {
-  const response = await fetch(buildUrl(`/workflows/${workflowId}/complete-task`, { role }), {
+export async function completeWorkflowTask(workflowId) {
+  return apiFetch(`/workflows/${workflowId}/complete-task`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ worker_id: Number(workerId) }),
+    body: {},
   });
-
-  return handleResponse(response);
 }
 
-export async function finalizeWorkflow(workflowId, adminUserId, role) {
-  const response = await fetch(buildUrl(`/workflows/${workflowId}/finalize`, { role }), {
+export async function finalizeWorkflow(workflowId) {
+  return apiFetch(`/workflows/${workflowId}/finalize`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ admin_user_id: Number(adminUserId) }),
+    body: {},
   });
-
-  return handleResponse(response);
 }
 
-export async function reworkWorkflow(workflowId, payload, role) {
-  const response = await fetch(buildUrl(`/workflows/${workflowId}/rework`, { role }), {
+export async function reworkWorkflow(workflowId, payload) {
+  return apiFetch(`/workflows/${workflowId}/rework`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      admin_user_id: Number(payload.adminUserId),
+    body: {
       feedback_message: payload.feedbackMessage,
-    }),
+    },
   });
-
-  return handleResponse(response);
 }
 
-export async function sendWorkflowFeedback(workflowId, payload, role) {
-  const response = await fetch(buildUrl(`/workflows/${workflowId}/feedback`, { role }), {
+export async function sendWorkflowFeedback(workflowId, payload) {
+  return apiFetch(`/workflows/${workflowId}/feedback`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      admin_user_id: Number(payload.adminUserId),
+    body: {
       to_user_id: payload.toUserId ? Number(payload.toUserId) : null,
       message: payload.message,
-    }),
+    },
   });
-
-  return handleResponse(response);
 }
 
 export { API_BASE_URL };

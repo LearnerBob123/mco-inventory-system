@@ -1,3 +1,4 @@
+from app.models.auth_session import AuthSession
 from app.models.gun import Gun
 from app.models.inventory import InventoryItem
 from app.models.user import User
@@ -10,6 +11,7 @@ from app.models.workflow_feedback import WorkflowFeedback
 from app.models.workflow_resource_request import WorkflowResourceRequest
 
 __all__ = [
+    "AuthSession",
     "Gun",
     "InventoryItem",
     "User",

@@ -1,14 +1,15 @@
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.user import UserRead
+
 
 class ComponentRequestCreate(BaseModel):
     part_number: str = Field(min_length=1, max_length=50)
     requested_qty: int = Field(gt=0)
-    requested_by: int
 
 
 class ComponentDecisionRequest(BaseModel):
-    approved_by: int
+    pass
 
 
 class WorkOrderComponentRead(BaseModel):
@@ -21,3 +22,5 @@ class WorkOrderComponentRead(BaseModel):
     status: str
     requested_by: int
     approved_by: int | None
+    requested_by_user: UserRead
+    approved_by_user: UserRead | None

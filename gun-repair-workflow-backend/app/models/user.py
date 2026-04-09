@@ -12,6 +12,7 @@ class User(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     role: Mapped[str] = mapped_column(String(50), nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
 
     requested_components: Mapped[list["WorkOrderComponent"]] = relationship(
         back_populates="requested_by_user",
@@ -47,3 +48,4 @@ class User(Base):
         back_populates="to_user",
         foreign_keys="WorkflowFeedback.to_user_id",
     )
+    auth_sessions: Mapped[list["AuthSession"]] = relationship(back_populates="user", cascade="all, delete-orphan")

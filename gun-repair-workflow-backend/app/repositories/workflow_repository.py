@@ -13,9 +13,13 @@ class WorkflowRepository:
 
     def _base_statement(self):
         return select(Workflow).options(
+            selectinload(Workflow.created_by_user),
+            selectinload(Workflow.finalized_by_user),
             selectinload(Workflow.assignments).selectinload(WorkflowAssignment.user),
-            selectinload(Workflow.resource_requests),
-            selectinload(Workflow.feedback_entries),
+            selectinload(Workflow.resource_requests).selectinload(WorkflowResourceRequest.requested_by_user),
+            selectinload(Workflow.resource_requests).selectinload(WorkflowResourceRequest.reviewed_by_user),
+            selectinload(Workflow.feedback_entries).selectinload(WorkflowFeedback.from_user),
+            selectinload(Workflow.feedback_entries).selectinload(WorkflowFeedback.to_user),
         )
 
     def get_by_id(self, workflow_id: int) -> Workflow | None:
@@ -34,6 +38,10 @@ class WorkflowRepository:
             .order_by(Workflow.id.desc())
         )
         return list(self.db.scalars(statement).unique().all())
+
+    def list_by_work_order(self, *, work_order_id: int) -> list[Workflow]:
+        statement = self._base_statement().where(Workflow.work_order_id == work_order_id).order_by(Workflow.id.desc())
+        return list(self.db.scalars(statement).all())
 
     def create(self, *, title: str, work_order_id: int, created_by: int) -> Workflow:
         workflow = Workflow(title=title, work_order_id=work_order_id, created_by=created_by)
